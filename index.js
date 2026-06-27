@@ -478,30 +478,7 @@ async function run() {
       });
       res.json({ totalUsers, totalRecipes, totalPremiumMembers, totalReports });
     });
-    app.get("/admin/payments", verifyToken, verifyAdmin, async (req, res) => {
-      const payments = await paymentCollection
-        .find({})
-        .sort({ paidAt: -1 })
-        .toArray();
-
-      const emails = [...new Set(payments.map((p) => p.userEmail))];
-      const users = await userCollection
-        .find({ email: { $in: emails } })
-        .project({ email: 1, name: 1 })
-        .toArray();
-
-      const userMap = {};
-      users.forEach((u) => {
-        userMap[u.email] = u.name;
-      });
-
-      const result = payments.map((p) => ({
-        ...p,
-        userName: userMap[p.userEmail] || p.userEmail,
-      }));
-
-      res.json(result);
-    });
+    
     app.post("/favorites", verifyToken, async (req, res) => {
       const { userEmail, recipeId } = req.body;
 
