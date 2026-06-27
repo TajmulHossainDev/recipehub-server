@@ -248,6 +248,84 @@ async function run() {
       res.json(result);
     });
 
+    app.get("/my-recipes/:email", verifyToken, async (req, res) => {
+      const { email } = req.params;
+      if (req.user.email !== email) {
+        return res.status(403).json({ message: "Forbidden access" });
+      }
+      const result = await recipeCollection
+        .find({ authorEmail: email })
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.json(result);
+    });
+
+    app.post("/recipes", verifyToken, async (req, res) => {
+      const recipeData = req.body;
+      if (req.user.email !== recipeData.authorEmail) {
+        return res.status(403).json({ message: "Forbidden access" });
+      }
+      const author = await userCollection.findOne({
+        email: recipeData.authorEmail,
+      });
+      const userRecipeCount = await recipeCollection.countDocuments({
+        authorEmail: recipeData.authorEmail,
+      });
+      const FREE_LIMIT = 2;
+      if (!author?.isPremium && userRecipeCount >= FREE_LIMIT) {
+        return res.status(403).json({
+          message:
+            "Free plan limit reached. Upgrade to premium to add more recipes.",
+        });
+      }
+      const newRecipe = {
+        ...recipeData,
+        likesCount: 0,
+        isFeatured: false,
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const result = await recipeCollection.insertOne(newRecipe);
+      res.json(result);
+    });
+
+    app.patch("/recipes/:id", verifyToken, async (req, res) => {
+      const { id } = req.params;
+      const updateData = req.body;
+      const recipe = await recipeCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      if (!recipe) {
+        return res.status(404).json({ message: "Recipe not found" });
+      }
+      if (recipe.authorEmail !== req.user.email) {
+        return res.status(403).json({ message: "Forbidden access" });
+      }
+      const result = await recipeCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { ...updateData, updatedAt: new Date() } },
+      );
+      res.json(result);
+    });
+
+    app.delete("/recipes/:id", verifyToken, async (req, res) => {
+      const { id } = req.params;
+      const recipe = await recipeCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      if (!recipe) {
+        return res.status(404).json({ message: "Recipe not found" });
+      }
+      if (recipe.authorEmail !== req.user.email) {
+        return res.status(403).json({ message: "Forbidden access" });
+      }
+      const result = await recipeCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.json(result);
+    });
+
     console.log("Connected to MongoDB!");
   } finally {
   }
