@@ -3,10 +3,21 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 const dotenv = require("dotenv");
 dotenv.config();
 const express = require("express");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = process.env.MONGODB_URI;
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL,
+    credentials: true,
+  }),
+);
+app.use(express.json());
+app.use(cookieParser());
 
 const client = new MongoClient(uri, {
   serverApi: {
