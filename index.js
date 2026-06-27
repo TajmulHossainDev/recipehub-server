@@ -182,6 +182,72 @@ async function run() {
       res.json(result);
     });
 
+    app.get("/recipes", async (req, res) => {
+      const { category, search, page = 1, limit = 6 } = req.query;
+      const query = {};
+      if (category && category !== "All") {
+        query.category = { $in: [category] };
+      }
+      if (search) {
+        query.recipeName = { $regex: search, $options: "i" };
+      }
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const skip = (pageNum - 1) * limitNum;
+      const total = await recipeCollection.countDocuments(query);
+      const recipes = await recipeCollection
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .toArray();
+      res.json({
+        recipes,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+        currentPage: pageNum,
+      });
+    });
+
+    app.get("/recipes/categories", async (req, res) => {
+      const categories = await recipeCollection
+        .aggregate([
+          { $group: { _id: "$category", count: { $sum: 1 } } },
+          { $project: { _id: 0, name: "$_id", count: 1 } },
+          { $sort: { name: 1 } },
+        ])
+        .toArray();
+      res.send(categories);
+    });
+
+    app.get("/recipes/featured", async (req, res) => {
+      const result = await recipeCollection
+        .find({ isFeatured: true })
+        .limit(6)
+        .toArray();
+      res.json(result);
+    });
+
+    app.get("/recipes/popular", async (req, res) => {
+      const result = await recipeCollection
+        .find()
+        .sort({ likesCount: -1 })
+        .limit(4)
+        .toArray();
+      res.json(result);
+    });
+
+    app.get("/recipes/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await recipeCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      if (!result) {
+        return res.status(404).json({ message: "Recipe not found" });
+      }
+      res.json(result);
+    });
+
     console.log("Connected to MongoDB!");
   } finally {
   }
