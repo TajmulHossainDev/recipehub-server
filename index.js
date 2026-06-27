@@ -80,6 +80,108 @@ async function run() {
     const reportCollection = db.collection("reports");
     const paymentCollection = db.collection("payments");
 
+    app.post("/auth/set-cookie", (req, res) => {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ message: "Token required" });
+      }
+      res.cookie("auth_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      res.json({ message: "Cookie set successfully" });
+    });
+
+    app.post("/auth/clear-cookie", (req, res) => {
+      res.clearCookie("auth_token");
+      res.json({ message: "Cookie cleared" });
+    });
+
+    app.post("/users", async (req, res) => {
+      const userData = req.body;
+      const existingUser = await userCollection.findOne({
+        email: userData.email,
+      });
+      if (existingUser) {
+        return res.json({ message: "User already exists", inserted: false });
+      }
+      const newUser = {
+        name: userData.name,
+        email: userData.email,
+        image: userData.image || "",
+        role: "user",
+        isBlocked: false,
+        isPremium: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const result = await userCollection.insertOne(newUser);
+      res.json(result);
+    });
+
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+      const { email } = req.params;
+      if (req.user.email !== email) {
+        return res.status(403).json({ message: "Forbidden access" });
+      }
+      const user = await userCollection.findOne({ email });
+      const isAdmin = user?.role === "admin";
+      res.json({ admin: isAdmin });
+    });
+
+    app.get("/users/:email", verifyToken, async (req, res) => {
+      const { email } = req.params;
+      if (req.user.email !== email) {
+        return res.status(403).json({ message: "Forbidden access" });
+      }
+      const user = await userCollection.findOne({ email });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    });
+
+    app.patch(
+      "/users/block/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const { id } = req.params;
+        const { isBlocked } = req.body;
+        const result = await userCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { isBlocked, updatedAt: new Date() } },
+        );
+        res.json(result);
+      },
+    );
+
+    app.patch("/users/profile/:email", verifyToken, async (req, res) => {
+      const { email } = req.params;
+      if (req.user.email !== email) {
+        return res.status(403).json({ message: "Forbidden access" });
+      }
+      const { name, image } = req.body;
+      const updateDoc = { updatedAt: new Date() };
+      if (name) updateDoc.name = name;
+      if (image) updateDoc.image = image;
+      const result = await userCollection.updateOne(
+        { email },
+        { $set: updateDoc },
+      );
+      res.json(result);
+    });
+
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+      const result = await userCollection
+        .find()
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.json(result);
+    });
+
     console.log("Connected to MongoDB!");
   } finally {
   }
