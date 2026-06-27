@@ -804,23 +804,7 @@ async function run() {
       res.json({ url: session.url, sessionId: session.id });
     });
 
-    app.get("/verify-payment/:sessionId", verifyToken, async (req, res) => {
-      const { sessionId } = req.params;
-
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-      if (session.payment_status !== "paid") {
-        return res.status(400).json({ message: "Payment not completed" });
-      }
-
-      res.json({
-        success: true,
-        type: session.metadata.type,
-        amount: session.amount_total / 100,
-        transactionId: session.payment_intent,
-        recipeId: session.metadata.recipeId || null,
-      });
-    });
+    
 
     console.log("Connected to MongoDB!");
   } finally {
