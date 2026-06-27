@@ -59,6 +59,18 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
+const verifyAdmin = async (req, res, next) => {
+  const email = req.user?.email;
+  const db = client.db("recipehub");
+  const userCollection = db.collection("users");
+  const user = await userCollection.findOne({ email });
+
+  if (!user || user.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden: Admins only" });
+  }
+  next();
+};
+
 async function run() {
   try {
     const db = client.db("recipehub");
